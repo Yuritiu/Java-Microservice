@@ -1,12 +1,13 @@
 server:
-  port: 8080
+  port: 8086
 
 spring:
+  # H2 in-memory database for development
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/userservice}
-    username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:password}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
 
   jpa:
     hibernate:
@@ -15,10 +16,17 @@ spring:
     properties:
       jakarta:
         hibernate:
-          dialect: org.hibernate.dialect.PostgreSQLDialect
+          dialect: org.hibernate.dialect.H2Dialect
           format_sql: true
 
+  h2:
+    console:
+      enabled: true
+
+  # Ensure Redis is completely disabled for dev
   redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    database: 0
+    enabled: false
+
+  # Explicitly set active profile
+  profiles:
+    active: dev
