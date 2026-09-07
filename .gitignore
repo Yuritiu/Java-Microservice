@@ -1,0 +1,24 @@
+# Built application files
+target/
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Spring Boot
+.DS_Store
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Mac
+.DS_Store
