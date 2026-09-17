@@ -20,6 +20,10 @@ public class UserService {
     }
 
     public User createUser(User user) {
+
+    user.setCreatedAt(java.time.LocalDateTime.now());
+    user.setUpdatedAt(java.time.LocalDateTime.now());
+
         return userRepository.save(user);
     }
 

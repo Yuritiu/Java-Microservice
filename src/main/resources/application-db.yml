@@ -4,17 +4,22 @@ spring:
     username: userservice_user
     password: userservice_password
     driver-class-name: org.postgresql.Driver
-    
+
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
+    defer-datasource-initialization: true
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
 
-  # Disable H2 console for tests
+  # Disable H2 console since we're using PostgreSQL
   h2:
     console:
       enabled: false
+
+  # Redis configuration (disabled by default)
+  redis:
+    enabled: false
