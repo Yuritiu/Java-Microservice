@@ -20,6 +20,15 @@ spring:
     console:
       enabled: false
 
-  # Redis configuration (disabled by default)
+  # Redis configuration
   redis:
-    enabled: false
+    host: localhost
+    port: 6379
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 8
+        min-idle: 0
+  # Enable Redis caching
+  cache:
+    type: redis

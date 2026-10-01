@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 public class UserService {
@@ -15,15 +16,14 @@ public class UserService {
         return userRepository.findAll();
     }
 
+    @Cacheable("users")
     public Optional<User> getUserById(Long id) {
         return userRepository.findById(id);
     }
 
     public User createUser(User user) {
-
-    user.setCreatedAt(java.time.LocalDateTime.now());
-    user.setUpdatedAt(java.time.LocalDateTime.now());
-
+        user.setCreatedAt(java.time.LocalDateTime.now());
+        user.setUpdatedAt(java.time.LocalDateTime.now());
         return userRepository.save(user);
     }
 
