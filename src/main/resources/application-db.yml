@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/user_service_db
+    url: jdbc:postgresql://db:5432/user_service_db
     username: userservice_user
     password: userservice_password
     driver-class-name: org.postgresql.Driver
@@ -20,6 +20,27 @@ spring:
     console:
       enabled: false
 
-  # Redis configuration (disabled by default)
+  # Redis configuration
   redis:
-    enabled: false
+    host: redis
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+        max-wait: 2000ms
+        time-between-eviction-runs: 10000ms
+      shutdown-timeout: 100ms
+    jedis:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+        max-wait: 2000ms
+
+management:
+  health:
+    redis:
+      enabled: true

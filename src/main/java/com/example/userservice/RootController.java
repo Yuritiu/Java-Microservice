@@ -8,6 +8,6 @@ public class RootController {
     
     @GetMapping("/")
     public String root() {
-        return "Welcome to User Service API Root";
+        return "Welcome to User Service API";
     }
 }
