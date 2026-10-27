@@ -20,7 +20,9 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:15
+        # Full registry address: Oracle's nodes (CRI-O) refuse short names like
+        # "postgres:15" because they could mean more than one registry.
+        image: docker.io/library/postgres:15
         env:
         - name: POSTGRES_DB
           value: "user_service_db"

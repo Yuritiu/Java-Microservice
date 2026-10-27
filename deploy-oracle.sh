@@ -44,7 +44,9 @@ COMMIT=$(git rev-parse HEAD | cut -c1-7)
 TAG="sha-$COMMIT"
 
 if ! git diff --quiet HEAD; then
-  echo "Note: you have uncommitted changes. They are NOT included; this deploys commit $COMMIT."
+  echo "Note: you have uncommitted changes. The app image is from commit $COMMIT (code changes"
+  echo "      need committing, pushing and a green CI run), but the Kubernetes files are used as"
+  echo "      they are in your folder."
 fi
 git branch -r --contains HEAD | grep -q 'origin/main' \
   || fail "commit $COMMIT isn't on GitHub's main branch yet, so no image has been built for it. Push first."

@@ -17,7 +17,7 @@ spec:
       containers:
       - name: redis
         # Tracks the latest Redis 8 release; published for both amd64 and arm64.
-        image: redis:8-alpine
+        image: docker.io/library/redis:8-alpine
         ports:
         - containerPort: 6379
         readinessProbe:

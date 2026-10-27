@@ -42,7 +42,7 @@ spec:
           # before the cache is cleared.
           initContainers:
           - name: reset-database
-            image: postgres:15
+            image: docker.io/library/postgres:15
             command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/scripts/reset.sql"]
             env:
             - name: PGHOST
@@ -70,7 +70,7 @@ spec:
                 memory: "128Mi"
           containers:
           - name: clear-cache
-            image: redis:8-alpine
+            image: docker.io/library/redis:8-alpine
             command: ["redis-cli", "-h", "user-service-redis", "FLUSHDB"]
             resources:
               requests:
