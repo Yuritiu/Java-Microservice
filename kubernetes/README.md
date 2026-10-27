@@ -22,10 +22,15 @@ kubernetes/
 ├── overlays/
 │   ├── minikube/            uses the image built straight into minikube
 │   └── oracle/              image from GitHub Container Registry, Oracle block
-│                            storage, smaller CPU reservations for the free node
+│       │                    storage, smaller CPU reservations for the free node
+│       ├── ingress-https.yaml   public domain + Let's Encrypt certificate
+│       └── settings.env     DOMAIN: the public web address
+├── cert-manager/
+│   └── cluster-issuer.yaml  how cert-manager gets certificates from Let's Encrypt
 └── traefik/
     ├── values-minikube.yaml Traefik on port 80 of the minikube node
-    └── values-oracle.yaml   Traefik behind a free Oracle Network Load Balancer
+    └── values-oracle.yaml   Traefik behind a free Oracle Network Load Balancer,
+                             redirecting http:// to https://
 ```
 
 To see exactly what an overlay produces, without touching any cluster:
@@ -73,9 +78,15 @@ changes. It always targets minikube, whichever cluster kubectl is pointed at.
 ./deploy-oracle.sh
 ```
 
-Installs Traefik and the load balancer, then deploys the image for your current
-commit (`ghcr.io/yuritiu/java-microservice:sha-<commit>`) and prints the public
-URL. It asks for confirmation before changing anything.
+Installs Traefik behind the load balancer and cert-manager, then deploys the
+image for your current commit (`ghcr.io/yuritiu/java-microservice:sha-<commit>`),
+gets an HTTPS certificate and prints the URL. It asks for confirmation first.
+
+**Domain:** the address comes from `DOMAIN` in `overlays/oracle/settings.env`, a
+free [DuckDNS](https://www.duckdns.org) subdomain pointed at the load balancer's
+IP. The script checks the domain points at the right IP before asking Let's
+Encrypt for a certificate. The load balancer keeps its IP as long as the
+`traefik` Service exists. If it's ever recreated, update the IP on DuckDNS.
 
 ## Public demo safeguards
 
@@ -95,6 +106,7 @@ kubectl get pods -n user-service                 # what's running
 kubectl logs -n user-service deploy/user-service-deployment   # app logs
 kubectl describe pod -n user-service <pod-name>  # why a pod is stuck
 kubectl get svc traefik -n traefik               # load balancer and its public IP
+kubectl describe certificate -n user-service     # HTTPS certificate status and renewal date
 kubectl create job --from=cronjob/demo-reset demo-reset-manual -n user-service   # reset the demo data now
 minikube stop                                    # pause the local cluster, keeps data
 ```

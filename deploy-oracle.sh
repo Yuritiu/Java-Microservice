@@ -15,6 +15,11 @@ cd "$(dirname "$0")"
 NAMESPACE=user-service
 IMAGE_REPO=ghcr.io/yuritiu/java-microservice
 TRAEFIK_CHART_VERSION=42.1.3
+CERT_MANAGER_VERSION=v1.21.3
+
+# DOMAIN (the public web address) lives in settings.env.
+# shellcheck source=kubernetes/overlays/oracle/settings.env
+source kubernetes/overlays/oracle/settings.env
 
 fail() { echo "Error: $*" >&2; exit 1; }
 
@@ -81,6 +86,26 @@ for _ in $(seq 1 60); do
 done
 [ -n "$LB_IP" ] || fail "no public IP after 5 minutes. Check: kubectl --context $ORACLE_CONTEXT describe svc traefik -n traefik"
 
+# ---- Domain and HTTPS ------------------------------------------------------
+# Let's Encrypt only issues a certificate if the domain already points at our
+# load balancer, so check that first instead of letting it fail.
+if [ "$DOMAIN" = "CHANGE-ME.duckdns.org" ]; then
+  fail "set DOMAIN in kubernetes/overlays/oracle/settings.env first.
+Create a subdomain at https://www.duckdns.org, set its IP to $LB_IP, then run this again."
+fi
+DNS_IP=$(getent hosts "$DOMAIN" | awk '{print $1; exit}' || true)
+[ "$DNS_IP" = "$LB_IP" ] || fail "$DOMAIN points at '${DNS_IP:-nothing}', but the load balancer is $LB_IP.
+Set the IP for your subdomain to $LB_IP on https://www.duckdns.org, wait a minute, then run this again."
+
+echo "==> Installing cert-manager (gets and renews HTTPS certificates)"
+helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --version "$CERT_MANAGER_VERSION" \
+  --kube-context "$ORACLE_CONTEXT" \
+  --namespace cert-manager --create-namespace \
+  --set crds.enabled=true \
+  --wait --timeout 10m
+k apply -f kubernetes/cert-manager/cluster-issuer.yaml
+
 # ---- The app ---------------------------------------------------------------
 echo "==> Creating the namespace and database secret"
 k apply -f kubernetes/base/namespace.yaml
@@ -98,9 +123,11 @@ if k get deployment user-service-deployment -n "$NAMESPACE" >/dev/null 2>&1; the
 fi
 
 echo "==> Applying manifests"
-# Build the oracle overlay and swap the IMAGE_TAG placeholder for this commit's tag.
-RENDERED=$(kubectl kustomize kubernetes/overlays/oracle | sed "s|$IMAGE_REPO:IMAGE_TAG|$IMAGE_REPO:$TAG|")
+# Build the oracle overlay, then fill in this commit's image tag and the domain.
+RENDERED=$(kubectl kustomize kubernetes/overlays/oracle \
+  | sed -e "s|$IMAGE_REPO:IMAGE_TAG|$IMAGE_REPO:$TAG|" -e "s|DOMAIN_PLACEHOLDER|$DOMAIN|g")
 grep -q "$IMAGE_REPO:$TAG" <<<"$RENDERED" || fail "couldn't set the image tag in the oracle overlay."
+grep -q "host: $DOMAIN" <<<"$RENDERED" || fail "couldn't set the domain in the oracle overlay."
 k apply -f - <<<"$RENDERED"
 
 echo "==> Waiting for everything to be ready"
@@ -116,6 +143,15 @@ if [ "$ALREADY_DEPLOYED" = false ]; then
   k wait --for=condition=complete job/demo-reset-initial -n "$NAMESPACE" --timeout=180s
 fi
 
+echo "==> Waiting for the HTTPS certificate from Let's Encrypt (usually under a minute)"
+# cert-manager creates the Certificate a moment after the Ingress appears.
+for _ in $(seq 1 30); do
+  k get certificate user-service-tls -n "$NAMESPACE" >/dev/null 2>&1 && break
+  sleep 2
+done
+k wait --for=condition=Ready certificate/user-service-tls -n "$NAMESPACE" --timeout=300s \
+  || fail "no certificate yet. See why with: kubectl --context $ORACLE_CONTEXT describe certificate,challenge -n $NAMESPACE"
+
 echo
 echo "Done. $IMAGE_REPO:$TAG is live at:"
-echo "  http://$LB_IP/"
+echo "  https://$DOMAIN/"

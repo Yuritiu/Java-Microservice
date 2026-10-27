@@ -15,6 +15,19 @@ service:
     # Keep the visitor's IP address. Required for the NLB to preserve it.
     externalTrafficPolicy: Local
 
+ports:
+  web:
+    # Redirect every http:// request to https://.
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+    # ...except Let's Encrypt's checks at /.well-known/acme-challenge/, which
+    # must be answered over plain HTTP for cert-manager to get the certificate.
+    allowACMEByPass: true
+
 resources:
   requests:
     cpu: 50m

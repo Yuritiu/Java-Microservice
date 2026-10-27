@@ -1,10 +1,12 @@
-# Oracle Cloud (OKE). The base plus three cloud differences:
+# Oracle Cloud (OKE). The base plus four cloud differences:
 #   1. The image comes from GitHub Container Registry, built by GitHub Actions.
 #   2. Postgres gets an Oracle Block Volume (50 GB is Oracle's minimum size).
 #   3. Smaller CPU reservations, so everything fits on one free ARM node.
+#   4. The public domain with an HTTPS certificate from Let's Encrypt.
 #
 # Deploy with ./deploy-oracle.sh rather than kubectl apply -k: the script
-# swaps IMAGE_TAG for the tag of the commit you're deploying (sha-<commit>).
+# swaps IMAGE_TAG for the tag of the commit you're deploying (sha-<commit>)
+# and DOMAIN_PLACEHOLDER for DOMAIN in settings.env.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -19,3 +21,4 @@ images:
 patches:
   - path: postgres-storage.yaml
   - path: app-resources.yaml
+  - path: ingress-https.yaml
