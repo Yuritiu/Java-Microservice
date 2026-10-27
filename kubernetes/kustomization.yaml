@@ -1,0 +1,18 @@
+# Lets you apply everything in one go with:  kubectl apply -k kubernetes/
+# Kustomize is built into kubectl, so nothing extra is needed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Everything goes in its own namespace, so it's easy to inspect or remove:
+#   kubectl get all -n user-service
+#   kubectl delete namespace user-service
+namespace: user-service
+
+resources:
+  - namespace.yaml
+  - postgres-pvc.yaml
+  - postgres-deployment.yaml
+  - redis-deployment.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml

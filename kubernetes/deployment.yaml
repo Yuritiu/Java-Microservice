@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service-deployment
+  labels:
+    app: user-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        # Locally the deploy script builds this image straight into minikube.
+        # For Oracle this will point at GitHub Container Registry instead.
+        image: user-service:local
+        # Use the image already in the cluster rather than trying Docker Hub.
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "db"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://user-service-postgres:5432/user_service_db"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: user-service-db
+              key: username
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: user-service-db
+              key: password
+        - name: SPRING_DATA_REDIS_HOST
+          value: "user-service-redis"
+        - name: SPRING_DATA_REDIS_PORT
+          value: "6379"
+        # Gives Spring Boot up to 3 minutes to start. Liveness and readiness
+        # checks don't begin until this passes, so a slow start isn't
+        # mistaken for a crash.
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 36
+        # "Is the app alive?" Failing this restarts the pod. It deliberately
+        # doesn't check the database, so a DB blip won't restart every pod.
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          periodSeconds: 10
+          failureThreshold: 3
+        # "Can it serve requests?" Checks Postgres and Redis too. Failing this
+        # just stops traffic going to the pod until it recovers.
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "384Mi"
+            cpu: "250m"
+          # No CPU limit: Java needs a burst of CPU at startup, and a limit
+          # makes it crawl. The memory limit stays.
+          limits:
+            memory: "512Mi"

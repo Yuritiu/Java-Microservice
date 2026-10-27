@@ -1,7 +1,7 @@
 spring:
   profiles:
     active: db
-    
+
 management:
   endpoints:
     web:
@@ -10,3 +10,11 @@ management:
   endpoint:
     health:
       show-details: always
+      # Adds /actuator/health/liveness and /actuator/health/readiness,
+      # which the Kubernetes probes use.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          # Only report "ready" once Postgres and Redis are reachable too.
+          include: readinessState,db,redis

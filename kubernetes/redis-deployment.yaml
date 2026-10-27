@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service-redis
+  labels:
+    app: user-service-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service-redis
+  template:
+    metadata:
+      labels:
+        app: user-service-redis
+    spec:
+      containers:
+      - name: redis
+        # Tracks the latest Redis 8 release; published for both amd64 and arm64.
+        image: redis:8-alpine
+        ports:
+        - containerPort: 6379
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service-redis
+spec:
+  selector:
+    app: user-service-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP

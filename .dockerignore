@@ -1,0 +1,8 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+kubernetes/
+docker-compose.yml
+deploy-k8s.sh

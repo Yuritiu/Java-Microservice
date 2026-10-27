@@ -1,0 +1,13 @@
+# Asks the cluster for 1Gi of storage that survives pod restarts.
+# No storageClassName, so the cluster's default storage is used
+# (minikube's built-in provisioner locally, Oracle block volumes in the cloud).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

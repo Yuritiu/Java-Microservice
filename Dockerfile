@@ -1,32 +1,30 @@
-# Simple Dockerfile that works with the available Java environment
-FROM ubuntu:20.04
+# ---- Stage 1: build the jar ----
+# Uses an image that already has Maven + JDK 17, so nothing needs installing on your PC.
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /build
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH=$PATH:$JAVA_HOME/bin
+# Download dependencies first. This layer is cached until pom.xml changes,
+# so rebuilds after a code change are much faster.
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
 
-# Install Java 17
-RUN apt-get update && apt-get install -y \
-    openjdk-17-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+COPY src ./src
+# Tests need a live Postgres, so they are skipped here and run separately (e.g. in CI).
+RUN mvn -B -q package -DskipTests
 
-# Create app directory
+# ---- Stage 2: the image that actually runs ----
+# JRE only (no compiler, no Maven), so the final image is much smaller.
+# eclipse-temurin publishes amd64 and arm64, which matters for Oracle's ARM servers.
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copy the JAR file
-COPY target/user-service-0.0.1-SNAPSHOT.jar app.jar
-
-# Expose port
-EXPOSE 8080
-
-# Create a non-root user
-RUN addgroup --system spring && adduser --system spring
+RUN groupadd --system spring && useradd --system --gid spring spring
+COPY --from=build /build/target/user-service-0.0.1-SNAPSHOT.jar app.jar
 USER spring:spring
 
-# Health check using Spring Boot Actuator
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1
+EXPOSE 8080
 
-# Run the application
+# Size the Java heap from the container's memory limit instead of the host's RAM.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
