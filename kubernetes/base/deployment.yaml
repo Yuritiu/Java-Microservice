@@ -16,10 +16,10 @@ spec:
     spec:
       containers:
       - name: user-service
-        # Locally the deploy script builds this image straight into minikube.
-        # For Oracle this will point at GitHub Container Registry instead.
-        image: user-service:local
-        # Use the image already in the cluster rather than trying Docker Hub.
+        # The overlays fill in where the image comes from:
+        #   minikube: user-service:local, built straight into minikube
+        #   oracle:   ghcr.io/yuritiu/java-microservice:sha-<commit>, built by GitHub Actions
+        image: user-service
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

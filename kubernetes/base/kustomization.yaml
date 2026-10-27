@@ -1,5 +1,7 @@
-# Lets you apply everything in one go with:  kubectl apply -k kubernetes/
-# Kustomize is built into kubectl, so nothing extra is needed.
+# The shared setup used everywhere. Don't apply this directly. Apply an overlay:
+#   kubernetes/overlays/minikube   local cluster
+#   kubernetes/overlays/oracle     Oracle Cloud (OKE)
+# Each overlay starts from this base and changes only what differs.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -15,5 +17,6 @@ resources:
   - redis-deployment.yaml
   - deployment.yaml
   - service.yaml
+  - middlewares.yaml
   - ingress.yaml
   - demo-reset.yaml

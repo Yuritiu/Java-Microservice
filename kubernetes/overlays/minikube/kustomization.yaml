@@ -1,0 +1,11 @@
+# Local cluster. Same as the base, using the image deploy-minikube.sh builds
+# straight into minikube.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: user-service
+    newTag: local

@@ -1,0 +1,21 @@
+# Oracle Cloud (OKE). The base plus three cloud differences:
+#   1. The image comes from GitHub Container Registry, built by GitHub Actions.
+#   2. Postgres gets an Oracle Block Volume (50 GB is Oracle's minimum size).
+#   3. Smaller CPU reservations, so everything fits on one free ARM node.
+#
+# Deploy with ./deploy-oracle.sh rather than kubectl apply -k: the script
+# swaps IMAGE_TAG for the tag of the commit you're deploying (sha-<commit>).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: user-service
+    newName: ghcr.io/yuritiu/java-microservice
+    newTag: IMAGE_TAG
+
+patches:
+  - path: postgres-storage.yaml
+  - path: app-resources.yaml

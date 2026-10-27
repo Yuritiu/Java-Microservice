@@ -5,4 +5,5 @@ target/
 *.iml
 kubernetes/
 docker-compose.yml
-deploy-k8s.sh
+deploy-*.sh
+.github/

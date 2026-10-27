@@ -1,0 +1,11 @@
+# Use Oracle's block volume storage (oci-bv). 50 GB is the smallest volume
+# Oracle creates, and it fits in the free 200 GB alongside the node's boot disk.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  storageClassName: oci-bv
+  resources:
+    requests:
+      storage: 50Gi

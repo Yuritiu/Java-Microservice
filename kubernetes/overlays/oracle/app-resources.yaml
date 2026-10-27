@@ -1,0 +1,15 @@
+# The free node has 1 OCPU, and Kubernetes' own system pods take part of it.
+# Reserving 100m (a tenth of a CPU) per app pod instead of 250m lets both
+# replicas be scheduled. With no CPU limit set, they can still use spare CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service-deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: user-service
+        resources:
+          requests:
+            cpu: "100m"

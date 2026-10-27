@@ -1,0 +1,25 @@
+# Traefik middlewares: small processing steps applied to requests before they
+# reach the app. The Ingress switches them on with an annotation.
+# (Middleware is a Traefik resource type, installed with Traefik's Helm chart.)
+
+# Rate limiting per visitor IP: about 10 requests a second on average, with
+# bursts of up to 50 (the Swagger page loads several files at once).
+# Over the limit gets "429 Too Many Requests" without reaching the app.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+spec:
+  rateLimit:
+    average: 10
+    period: 1s
+    burst: 50
+---
+# Reject request bodies over 16 KB. A user is just a name and an email.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: limit-body
+spec:
+  buffering:
+    maxRequestBodyBytes: 16384

@@ -1,0 +1,23 @@
+# Traefik settings for Oracle Cloud (OKE).
+# Installed by deploy-oracle.sh with:
+#   helm upgrade --install traefik traefik/traefik -n traefik -f values-oracle.yaml
+
+service:
+  annotations:
+    # Ask Oracle for a Network Load Balancer. One is included in the free tier,
+    # and unlike the classic load balancer it passes visitors' real IP addresses
+    # through, which the per-visitor rate limit relies on.
+    oci.oraclecloud.com/load-balancer-type: "nlb"
+    # Let Kubernetes open exactly the firewall ports the load balancer needs.
+    oci.oraclecloud.com/security-rule-management-mode: "SL-All"
+  spec:
+    type: LoadBalancer
+    # Keep the visitor's IP address. Required for the NLB to preserve it.
+    externalTrafficPolicy: Local
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

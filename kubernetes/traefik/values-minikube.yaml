@@ -1,0 +1,25 @@
+# Traefik settings for the local minikube cluster.
+# Installed by deploy-minikube.sh with:
+#   helm upgrade --install traefik traefik/traefik -n traefik -f values-minikube.yaml
+
+ports:
+  web:
+    # Listen on port 80 of the minikube node itself, so http://<minikube ip>/ works
+    # just like the old nginx add-on did.
+    hostPort: 80
+  websecure:
+    # No HTTPS locally.
+    expose:
+      default: false
+
+service:
+  spec:
+    # minikube has no cloud load balancer, so no LoadBalancer Service.
+    type: ClusterIP
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

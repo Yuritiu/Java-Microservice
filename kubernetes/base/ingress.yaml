@@ -1,0 +1,24 @@
+# Routes outside HTTP traffic to the app's Service.
+# Handled by Traefik, which the deploy scripts install with Helm.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: user-service-ingress
+  annotations:
+    # Run every request through the middlewares in middlewares.yaml.
+    # Format is <namespace>-<middleware name>@kubernetescrd.
+    traefik.ingress.kubernetes.io/router.middlewares: user-service-rate-limit@kubernetescrd,user-service-limit-body@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+  # No host set, so it answers on any address (the minikube IP locally, the
+  # load balancer IP on Oracle). A real domain gets added here with HTTPS.
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service-service
+            port:
+              number: 8080
