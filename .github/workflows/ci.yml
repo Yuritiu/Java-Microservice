@@ -1,0 +1,96 @@
+# Runs on every push and pull request to main:
+#   1. test  - compiles the code and runs the Spock tests
+#   2. image - (pushes to main only, and only if the tests pass) builds the Docker
+#              image for x86 and ARM and pushes it to GitHub Container Registry
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Adds a "Run workflow" button on the Actions tab for manual runs.
+  workflow_dispatch:
+
+# Least privilege by default. The image job asks for more below.
+permissions:
+  contents: read
+
+# If you push twice quickly, cancel the older run instead of running both.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Registry image names must be lowercase.
+  IMAGE: ghcr.io/yuritiu/java-microservice
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          # Keeps downloaded Maven dependencies between runs, so later runs are faster.
+          cache: maven
+
+      - name: Build and run tests
+        run: mvn -B verify
+
+  image:
+    name: Build and push image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # needed to push to GitHub Container Registry
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      # QEMU lets this x86 machine build ARM images (for Oracle's Ampere servers).
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      # Buildx is Docker's builder that can make multi-architecture images.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # GITHUB_TOKEN is created automatically for each run. No secret to set up.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tags each image with the commit (e.g. sha-1a2b3c4) and "latest". Kubernetes
+      # will use the commit tag, so you always know exactly which code is running.
+      - name: Work out image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Reuse unchanged layers from previous runs.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

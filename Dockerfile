@@ -1,6 +1,9 @@
 # ---- Stage 1: build the jar ----
 # Uses an image that already has Maven + JDK 17, so nothing needs installing on your PC.
-FROM maven:3.9-eclipse-temurin-17 AS build
+# --platform=$BUILDPLATFORM runs this stage natively on the build machine, even when
+# making an ARM image on an x86 machine. A jar runs on any CPU, so it only needs
+# building once, and Maven never runs under slow CPU emulation.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 
 # Download dependencies first. This layer is cached until pom.xml changes,
