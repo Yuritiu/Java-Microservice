@@ -2,14 +2,33 @@ spring:
   profiles:
     active: db
 
+server:
+  # Trust X-Forwarded-* headers from the ingress, so redirects and the
+  # Swagger "Try it out" URLs use https:// once the site is behind HTTPS.
+  forward-headers-strategy: framework
+
+# Maximum users the public demo will hold. 0 = no limit (local development).
+# Kubernetes sets this with the DEMO_MAXUSERS environment variable.
+demo:
+  max-users: 0
+
+springdoc:
+  swagger-ui:
+    # Open each endpoint's "Try it out" form straight away.
+    try-it-out-enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # Health only. /actuator/metrics would be public once this is online.
+        include: health
   endpoint:
     health:
-      show-details: always
+      # Kubernetes only needs the status code. Don't show visitors database details.
+      show-details: never
       # Adds /actuator/health/liveness and /actuator/health/readiness,
       # which the Kubernetes probes use.
       probes:

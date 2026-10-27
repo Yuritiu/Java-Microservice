@@ -1,0 +1,84 @@
+# Resets the public demo every night: empties the users table, adds a few
+# sample users, then clears the Redis cache so nothing stale is served.
+#
+# Run it by hand at any time with:
+#   kubectl create job --from=cronjob/demo-reset demo-reset-manual -n user-service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-reset-sql
+data:
+  reset.sql: |
+    BEGIN;
+    TRUNCATE TABLE users RESTART IDENTITY;
+    INSERT INTO users (name, email, created_at, updated_at) VALUES
+      ('Ada Lovelace',    'ada@example.com',     now(), now()),
+      ('Alan Turing',     'alan@example.com',    now(), now()),
+      ('Grace Hopper',    'grace@example.com',   now(), now()),
+      ('Katherine Johnson','katherine@example.com', now(), now()),
+      ('Dennis Ritchie',  'dennis@example.com',  now(), now());
+    COMMIT;
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demo-reset
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "Europe/London"
+  # Never run two resets at once, and keep only a little history.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      # Clean up finished job pods after a day.
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: OnFailure
+          # Init containers run first and in order, so the database is reset
+          # before the cache is cleared.
+          initContainers:
+          - name: reset-database
+            image: postgres:15
+            command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/scripts/reset.sql"]
+            env:
+            - name: PGHOST
+              value: user-service-postgres
+            - name: PGDATABASE
+              value: user_service_db
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: user-service-db
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: user-service-db
+                  key: password
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+          containers:
+          - name: clear-cache
+            image: redis:8-alpine
+            command: ["redis-cli", "-h", "user-service-redis", "FLUSHDB"]
+            resources:
+              requests:
+                memory: "16Mi"
+                cpu: "50m"
+              limits:
+                memory: "64Mi"
+          volumes:
+          - name: scripts
+            configMap:
+              name: demo-reset-sql

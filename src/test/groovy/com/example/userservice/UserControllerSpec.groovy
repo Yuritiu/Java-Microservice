@@ -1,109 +1,173 @@
 package com.example.userservice
 
+import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import spock.lang.Specification
-import spock.lang.Subject
-import spock.lang.Ignore
-import spock.lang.Unroll
 
-import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 
-import static org.mockito.Mockito.*
-
+/**
+ * Sends real HTTP requests through Spring MVC (JSON parsing, validation and
+ * GlobalExceptionHandler included), with the service mocked out.
+ * No database or Spring context needed.
+ */
 class UserControllerSpec extends Specification {
 
-    @Subject
-    UserController userController
+    UserService userService = Mock()
 
-    private UserService userService
+    MockMvc mvc = MockMvcBuilders
+            .standaloneSetup(new UserController(userService), new RootController())
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build()
 
-    def setup() {
-        userService = mock(UserService)
-        userController = new UserController(userService)
+    private static User user(Long id, String name, String email) {
+        def user = new User(name, email)
+        user.id = id
+        return user
     }
 
-    def "should get all users"() {
-        given:
-        def users = [new User("John Doe", "john@example.com"), new User("Jane Smith", "jane@example.com")]
-        when:
-        def result = userController.getAllUsers()
-        then:
-        result.size() == 2
-        result[0].getName() == "John Doe"
-        result[1].getName() == "Jane Smith"
+    private def postJson(String url, String json) {
+        mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(json)).andReturn().response
     }
 
-    def "should get user by id successfully"() {
-        given:
-        def user = new User("John Doe", "john@example.com")
-        user.setId(1L)
-        when:
-        def result = userController.getUserById(1L)
-        then:
-        result.statusCode == HttpStatus.OK
-        result.body.getId() == 1L
-        result.body.getName() == "John Doe"
+    private def putJson(String url, String json) {
+        mvc.perform(put(url).contentType(MediaType.APPLICATION_JSON).content(json)).andReturn().response
     }
 
-    def "should return not found when user by id does not exist"() {
-        given:
+    def "GET /api/users returns all users"() {
         when:
-        def result = userController.getUserById(999L)
+        def response = mvc.perform(get("/api/users")).andReturn().response
+
         then:
-        result.statusCode == HttpStatus.NOT_FOUND
+        1 * userService.getAllUsers() >> [user(1L, "John Doe", "john@example.com"), user(2L, "Jane Smith", "jane@example.com")]
+        response.status == 200
+        response.contentAsString.contains('"name":"John Doe"')
+        response.contentAsString.contains('"name":"Jane Smith"')
     }
 
-    def "should create user successfully"() {
-        given:
-        def user = new User("John Doe", "john@example.com")
-        def createdUser = new User("John Doe", "john@example.com")
-        createdUser.setId(1L)
-        createdUser.setCreatedAt(new java.time.LocalDateTime())
-        createdUser.setUpdatedAt(new java.time.LocalDateTime())
+    def "GET /api/users/{id} returns the user"() {
         when:
-        def result = userController.createUser(user)
+        def response = mvc.perform(get("/api/users/1")).andReturn().response
+
         then:
-        result.statusCode == HttpStatus.CREATED
-        result.body.getId() == 1L
-        result.body.getName() == "John Doe"
+        1 * userService.getUserById(1L) >> Optional.of(user(1L, "John Doe", "john@example.com"))
+        response.status == 200
+        response.contentAsString.contains('"id":1')
     }
 
-    def "should update user successfully"() {
-        given:
-        def user = new User("Updated Name", "updated@example.com")
-        def updatedUser = new User("Updated Name", "updated@example.com")
-        updatedUser.setId(1L)
-        updatedUser.setCreatedAt(new java.time.LocalDateTime())
-        updatedUser.setUpdatedAt(new java.time.LocalDateTime())
+    def "GET /api/users/{id} returns 404 when the user does not exist"() {
         when:
-        def result = userController.updateUser(1L, user)
+        def response = mvc.perform(get("/api/users/999")).andReturn().response
+
         then:
-        result.statusCode == HttpStatus.OK
-        result.body.getId() == 1L
-        result.body.getName() == "Updated Name"
+        1 * userService.getUserById(999L) >> Optional.empty()
+        response.status == 404
+        response.contentAsString.contains("User not found")
     }
 
-    def "should return not found when updating non-existing user"() {
-        given:
-        def user = new User("John Doe", "john@example.com")
+    def "POST /api/users creates a user and returns 201"() {
         when:
-        def result = userController.updateUser(999L, user)
+        def response = postJson("/api/users", '{"name":"John Doe","email":"john@example.com"}')
+
         then:
-        result.statusCode == HttpStatus.NOT_FOUND
+        1 * userService.createUser({ it.name == "John Doe" && it.email == "john@example.com" }) >> user(1L, "John Doe", "john@example.com")
+        response.status == 201
+        response.contentAsString.contains('"id":1')
     }
 
-    def "should delete user successfully"() {
-        given:
+    def "POST /api/users ignores an id in the request body"() {
         when:
-        def result = userController.deleteUser(1L)
+        postJson("/api/users", '{"id":5,"name":"John Doe","email":"john@example.com"}')
+
         then:
-        result.statusCode == HttpStatus.NO_CONTENT
+        1 * userService.createUser({ it.id == null }) >> user(1L, "John Doe", "john@example.com")
     }
 
-    def "should handle root endpoint"() {
+    def "POST /api/users returns 400 with field errors for invalid input"() {
         when:
-        def result = userController.root()
+        def response = postJson("/api/users", '{"name":"","email":"not-an-email"}')
+
         then:
-        result.contains("Welcome to User Service API User")
+        0 * userService.createUser(_)
+        response.status == 400
+        response.contentAsString.contains("name")
+        response.contentAsString.contains("email")
+    }
+
+    def "POST /api/users returns 400 for malformed JSON"() {
+        when:
+        def response = postJson("/api/users", '{"name":')
+
+        then:
+        0 * userService.createUser(_)
+        response.status == 400
+    }
+
+    def "POST /api/users returns 409 when the email is taken"() {
+        when:
+        def response = postJson("/api/users", '{"name":"John Doe","email":"john@example.com"}')
+
+        then:
+        1 * userService.createUser(_) >> { throw new DuplicateEmailException("john@example.com") }
+        response.status == 409
+    }
+
+    def "POST /api/users returns 429 when the demo is full"() {
+        when:
+        def response = postJson("/api/users", '{"name":"John Doe","email":"john@example.com"}')
+
+        then:
+        1 * userService.createUser(_) >> { throw new DemoLimitReachedException(100) }
+        response.status == 429
+    }
+
+    def "PUT /api/users/{id} updates the user"() {
+        when:
+        def response = putJson("/api/users/1", '{"name":"Updated Name","email":"updated@example.com"}')
+
+        then:
+        1 * userService.updateUser(1L, _) >> user(1L, "Updated Name", "updated@example.com")
+        response.status == 200
+        response.contentAsString.contains('"name":"Updated Name"')
+    }
+
+    def "PUT /api/users/{id} returns 404 when the user does not exist"() {
+        when:
+        def response = putJson("/api/users/999", '{"name":"John Doe","email":"john@example.com"}')
+
+        then:
+        1 * userService.updateUser(999L, _) >> { throw new UserNotFoundException(999L) }
+        response.status == 404
+    }
+
+    def "DELETE /api/users/{id} returns 204"() {
+        when:
+        def response = mvc.perform(delete("/api/users/1")).andReturn().response
+
+        then:
+        1 * userService.deleteUser(1L)
+        response.status == 204
+    }
+
+    def "DELETE /api/users/{id} returns 404 when the user does not exist"() {
+        when:
+        def response = mvc.perform(delete("/api/users/999")).andReturn().response
+
+        then:
+        1 * userService.deleteUser(999L) >> { throw new UserNotFoundException(999L) }
+        response.status == 404
+    }
+
+    def "GET / redirects to the Swagger UI page"() {
+        when:
+        def response = mvc.perform(get("/")).andReturn().response
+
+        then:
+        response.status == 302
+        response.getHeader("Location") == "/swagger-ui/index.html"
     }
 }

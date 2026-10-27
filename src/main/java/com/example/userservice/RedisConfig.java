@@ -17,7 +17,9 @@ public class RedisConfig {
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10));
+                .entryTtl(Duration.ofMinutes(10))
+                // Never store "not found" results, so new users show up immediately.
+                .disableCachingNullValues();
         
         return RedisCacheManager.builder(connectionFactory)
                 .withCacheConfiguration("users", config)

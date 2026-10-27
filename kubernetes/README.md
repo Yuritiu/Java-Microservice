@@ -11,10 +11,11 @@ minikube. The same manifests will later be deployed to Oracle Cloud (OKE).
 | `namespace.yaml` | Keeps everything in one namespace, easy to inspect or delete |
 | `deployment.yaml` | Runs 2 copies of the app, with startup, liveness and readiness probes |
 | `service.yaml` | Gives the app pods one stable address inside the cluster |
-| `ingress.yaml` | Routes outside HTTP traffic to that Service (needs the nginx ingress controller) |
+| `ingress.yaml` | Routes outside HTTP traffic to that Service (needs the nginx ingress controller), with per-visitor rate limits |
 | `postgres-deployment.yaml` | Postgres pod and its Service |
 | `postgres-pvc.yaml` | 1Gi of storage for Postgres that survives restarts |
 | `redis-deployment.yaml` | Redis pod and its Service |
+| `demo-reset.yaml` | CronJob that resets the demo data to 5 sample users every night at 03:00 UK time and clears the cache |
 
 The database password is not stored in any file. `deploy-k8s.sh` generates a
 random one the first time and keeps it in a Kubernetes Secret called
@@ -43,12 +44,20 @@ This starts minikube, enables the ingress controller, builds the image inside
 minikube, creates the secret, applies the manifests and waits until everything
 is ready. Then it prints the URL. Run it again after code changes to redeploy.
 
+## Public demo safeguards
+
+- **Rate limiting** on the Ingress: about 10 requests a second per visitor, with short bursts allowed.
+- **User cap**: the app refuses new users past 100 (`DEMO_MAXUSERS` in `deployment.yaml`) and returns 429.
+- **Nightly reset**: the `demo-reset` CronJob wipes and reseeds the data. The first deploy runs it once straight away.
+- **Health details hidden**: `/actuator/health` only reports UP or DOWN, and metrics aren't exposed.
+
 ## Useful commands
 
 ```bash
 kubectl get pods -n user-service                 # what's running
 kubectl logs -n user-service deploy/user-service-deployment   # app logs
 kubectl describe pod -n user-service <pod-name>  # why a pod is stuck
+kubectl create job --from=cronjob/demo-reset demo-reset-manual -n user-service   # reset the demo data now
 minikube dashboard                               # web UI for the cluster
 minikube stop                                    # pause everything, keeps data
 kubectl delete namespace user-service            # remove the app and its data

@@ -42,6 +42,9 @@ spec:
           value: "user-service-redis"
         - name: SPRING_DATA_REDIS_PORT
           value: "6379"
+        # Cap on stored users, so the public demo can't be filled up.
+        - name: DEMO_MAXUSERS
+          value: "100"
         # Gives Spring Boot up to 3 minutes to start. Liveness and readiness
         # checks don't begin until this passes, so a slow start isn't
         # mistaken for a crash.

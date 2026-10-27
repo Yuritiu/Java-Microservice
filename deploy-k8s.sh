@@ -67,10 +67,20 @@ kubectl rollout status deployment/user-service-postgres   -n "$NAMESPACE" --time
 kubectl rollout status deployment/user-service-redis      -n "$NAMESPACE" --timeout=120s
 kubectl rollout status deployment/user-service-deployment -n "$NAMESPACE" --timeout=300s
 
+if [ "$ALREADY_DEPLOYED" = false ]; then
+  # First deploy: the app has now created the users table, so add the
+  # sample users straight away instead of waiting for the 03:00 reset.
+  echo "==> Adding sample users"
+  kubectl create job --from=cronjob/demo-reset demo-reset-initial -n "$NAMESPACE"
+  kubectl wait --for=condition=complete job/demo-reset-initial -n "$NAMESPACE" --timeout=120s
+fi
+
 URL="http://$(minikube ip)"
 echo
-echo "Done. Try:"
-echo "  curl $URL/"
+echo "Done. Open the API page in your browser:"
+echo "  $URL/"
+echo
+echo "Or from the terminal:"
 echo "  curl $URL/api/users"
 echo "  curl -X POST $URL/api/users -H 'Content-Type: application/json' -d '{\"name\":\"Ben\",\"email\":\"ben@example.com\"}'"
 echo
