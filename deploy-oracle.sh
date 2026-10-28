@@ -80,7 +80,9 @@ helm upgrade --install traefik traefik/traefik \
 echo "==> Waiting for the load balancer's public IP (can take a few minutes)"
 LB_IP=""
 for _ in $(seq 1 60); do
-  LB_IP=$(k get svc traefik -n traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+  # Oracle lists the load balancer's private IP (10.x) and its public IP. Take the public one.
+  LB_IP=$(k get svc traefik -n traefik -o jsonpath='{range .status.loadBalancer.ingress[*]}{.ip}{"\n"}{end}' 2>/dev/null \
+    | grep -Ev '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -n1 || true)
   [ -n "$LB_IP" ] && break
   sleep 5
 done
